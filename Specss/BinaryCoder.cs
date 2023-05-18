@@ -132,11 +132,16 @@ namespace Specss
         private readonly Schema schema;
         private readonly Dictionary<string, object> data;
         private MemoryStream? outputMemoryStream;
-
+        
         public BinaryCoder(Schema schema)
         {
             this.schema = schema;
             this.data = new Dictionary<string, object>();
+        }
+
+        public Schema GetSchema()
+        {
+            return schema;
         }
 
         public void SetField(String fieldName, object value)
