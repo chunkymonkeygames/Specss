@@ -13,26 +13,26 @@ namespace Specss
 
     public static class BinaryEncodeUtil
     {
-        public static Dictionary<SpecssFieldType, object> TypeToByte;
-        public static Dictionary<SpecssFieldType, object> ByteToType;
+        public static Dictionary<SpecssFieldTypeNum, object> TypeToByte;
+        public static Dictionary<SpecssFieldTypeNum, object> ByteToType;
 
         static BinaryEncodeUtil()
         {
 #pragma warning disable CS8974 // Converting method group to non-delegate type
-            TypeToByte = new Dictionary<SpecssFieldType, object> {
-                { SpecssFieldType.UInt32, UIntToBytes },
-                { SpecssFieldType.Int32, IntToBytes },
-                { SpecssFieldType.Float32, FloatToBytes },
-                { SpecssFieldType.UtfEightString, UTF8ToBytes },
-                { SpecssFieldType.RawBytesString, RawStringToBytes },
+            TypeToByte = new Dictionary<SpecssFieldTypeNum, object> {
+                { SpecssFieldTypeNum.UInt32, UIntToBytes },
+                { SpecssFieldTypeNum.Int32, IntToBytes },
+                { SpecssFieldTypeNum.Float32, FloatToBytes },
+                { SpecssFieldTypeNum.UtfEightString, UTF8ToBytes },
+                { SpecssFieldTypeNum.RawBytesString, RawStringToBytes },
             };
 
-            ByteToType = new Dictionary<SpecssFieldType, object> {
-                { SpecssFieldType.UInt32, BytesToUInt },
-                { SpecssFieldType.Int32, BytesToInt },
-                { SpecssFieldType.Float32, BytesToFloat },
-                { SpecssFieldType.UtfEightString, BytesToUTF8 },
-                { SpecssFieldType.RawBytesString, BytesToRawString },
+            ByteToType = new Dictionary<SpecssFieldTypeNum, object> {
+                { SpecssFieldTypeNum.UInt32, BytesToUInt },
+                { SpecssFieldTypeNum.Int32, BytesToInt },
+                { SpecssFieldTypeNum.Float32, BytesToFloat },
+                { SpecssFieldTypeNum.UtfEightString, BytesToUTF8 },
+                { SpecssFieldTypeNum.RawBytesString, BytesToRawString },
             };
 #pragma warning restore CS8974 // Converting method group to non-delegate type
         }
@@ -125,6 +125,65 @@ namespace Specss
             s.Read(i, 0, (int)len);
             return i;
         }
+
+
+
+        public static void EncodeField(Field field, MemoryStream ms, object data)
+        {
+            if (data is Array)
+            {
+                if (!field.FieldType.Repeated)
+                    throw new InvalidDataException("Provided an array but type is not repeatable");
+                IntToBytes(((Array)data).Length, ms);
+                foreach (object f in (Array)data) {
+                    EncodeField(field, ms, f);
+                }
+            }
+            else
+            {
+                if (field.FieldType.Repeated)
+                    IntToBytes(1, ms);
+                dynamic writer = TypeToByte[field.FieldType.Type];
+                writer(Convert.ChangeType(data, writer.GetType().GetMethod("Invoke").GetParameters()[0].ParameterType), ms);
+            }
+        }
+
+        private static T[] ChangeArrType<T>(object[] arr)
+        {
+            return Array.ConvertAll(arr, (item) => (T)item);
+        }
+
+        public static object DecodeField(Field field, MemoryStream ms)
+        {
+            object data;
+            if (!ByteToType.ContainsKey(field.FieldType.Type))
+                throw new InvalidDataException("Unknown type on field " + field.Name);
+            if (field.FieldType.Repeated)
+            {
+                var length = BytesToInt(ms);
+                if (length == 1)
+                {
+                    dynamic decoder = ByteToType[field.FieldType.Type];
+                    data = decoder(ms);
+                } else
+                {
+                    var arr = new object[length];
+                    for (int i = 0; i < length; i++)
+                    {
+                        arr[i] = DecodeField(field, ms);
+                    }
+                    Type T = arr[0].GetType();
+                    var method = typeof(BinaryEncodeUtil).GetMethod(nameof(ChangeArrType), BindingFlags.NonPublic | BindingFlags.Static, new Type[] { typeof(object[]) })!;
+                    var gen = method.MakeGenericMethod(T);
+                    data = gen.Invoke(null, new object[] { arr })!;
+                }
+            } else
+            {
+                dynamic decoder = ByteToType[field.FieldType.Type];
+                data = decoder(ms);
+            }
+            return data;
+        }
     }
 
     public class BinaryCoder
@@ -169,12 +228,11 @@ namespace Specss
                 // DATA
                 if (data.ContainsKey(f.Name))
                 {
-                    outputMemoryStream.WriteByte((byte)f.Type); // send type
-                    dynamic writer = BinaryEncodeUtil.TypeToByte[f.Type];
-                    writer(Convert.ChangeType(data[f.Name], writer.GetType().GetMethod("Invoke").GetParameters()[0].ParameterType), outputMemoryStream);
+                    outputMemoryStream.WriteByte((byte)f.FieldType.Type); // send type
+                    BinaryEncodeUtil.EncodeField(f, outputMemoryStream, data[f.Name]);
                 }
                 else
-                    outputMemoryStream.WriteByte((byte)SpecssFieldType.Omitted); // Ommitted type shows optional value 
+                    outputMemoryStream.WriteByte((byte)SpecssFieldTypeNum.Omitted); // Ommitted type shows optional value 
             }
             BinaryEncodeUtil.UIntToBytes(9999, outputMemoryStream);
         }
@@ -196,7 +254,7 @@ namespace Specss
                     if (!schema.HasField((int)fieldID))
                         throw new InvalidDataException("Unknown field " + fieldID);
                     var type = inputMemoryStream.ReadByte();
-                    if ((SpecssFieldType)type == SpecssFieldType.Omitted)
+                    if ((SpecssFieldTypeNum)type == SpecssFieldTypeNum.Omitted)
                         if (schema.GetField((int)fieldID).required)
                             throw new InvalidDataException("field " + schema.GetField((int)fieldID).Name + " is required but not included");
                         else
@@ -205,10 +263,10 @@ namespace Specss
                             continue;
                         }
                     var field = schema.GetField((int)fieldID);
-                    if (!BinaryEncodeUtil.ByteToType.ContainsKey((SpecssFieldType)type))
-                        throw new InvalidDataException("Unknown type on field " + field.Name);
-                    dynamic decoder = BinaryEncodeUtil.ByteToType[field.Type];
-                    object data = decoder(inputMemoryStream);
+                    Console.WriteLine("reading field " + field.Name);
+                    if ((int)field.FieldType.Type != type)
+                        throw new InvalidDataException("Schema does not match");
+                    var data = BinaryEncodeUtil.DecodeField(field, inputMemoryStream);
                     dictoutput[field.Name] = data;
                 }
                 foreach (Field f in schema.GetFields())

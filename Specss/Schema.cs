@@ -2,16 +2,25 @@
 
 namespace Specss
 {
-    public enum SpecssFieldType
+    public enum SpecssFieldTypeNum
     {
         Omitted = 0,
         Int32 = 1,
         UInt32 = 2,
         Float32 = 3,
         UtfEightString = 4,
-        RawBytesString = 5,
-        Array = 6,
-        Dict = 7
+        RawBytesString = 5
+    }
+
+    public struct SpecssFieldType
+    {
+        public SpecssFieldType(SpecssFieldTypeNum type, bool repeated)
+        {
+            Type = type;
+            Repeated = repeated;
+        }
+        public SpecssFieldTypeNum Type;
+        public bool Repeated;
     }
 
     public struct Field
@@ -19,11 +28,11 @@ namespace Specss
         public Field(String name, SpecssFieldType type, bool isRequired)
         {
             Name = name;
-            Type = type;
+            FieldType = type;
             required = isRequired;
         }
         public readonly string Name { get; }
-        public readonly SpecssFieldType Type { get; }
+        public readonly SpecssFieldType FieldType { get; }
         public readonly bool required;
         internal uint index = 0;
     }
