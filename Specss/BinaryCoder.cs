@@ -130,10 +130,10 @@ namespace Specss
 
         public static void EncodeField(Field field, MemoryStream ms, object data)
         {
-            if (data is Array)
+            if (data is Array && data.GetType().GetElementType()! != typeof(byte)) // basically, byte arrays are an acceptable field value, so make sure this isnt one of those
             {
                 if (!field.FieldType.Repeated)
-                    throw new InvalidDataException("Provided an array but type is not repeatable");
+                    throw new InvalidDataException("Provided an array but type is not repeatable " + field.Name + "/" + data.ToString() + "/" + data.GetType().ToString());
                 IntToBytes(((Array)data).Length, ms);
                 foreach (object f in (Array)data) {
                     EncodeField(field, ms, f);
