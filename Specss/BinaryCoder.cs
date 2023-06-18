@@ -25,6 +25,7 @@ namespace Specss
                 { SpecssFieldTypeNum.Float32, FloatToBytes },
                 { SpecssFieldTypeNum.UtfEightString, UTF8ToBytes },
                 { SpecssFieldTypeNum.RawBytesString, RawStringToBytes },
+                { SpecssFieldTypeNum.Long, LongToBytes },
             };
 
             ByteToType = new Dictionary<SpecssFieldTypeNum, object> {
@@ -33,28 +34,27 @@ namespace Specss
                 { SpecssFieldTypeNum.Float32, BytesToFloat },
                 { SpecssFieldTypeNum.UtfEightString, BytesToUTF8 },
                 { SpecssFieldTypeNum.RawBytesString, BytesToRawString },
+                { SpecssFieldTypeNum.Long, BytesToLong },
             };
 #pragma warning restore CS8974 // Converting method group to non-delegate type
         }
 
         // no IPAddress HostToNetworkOrder for floats
-        public static byte[] HostToNetworkOrder(float host)
+        public static byte[] HostToNetworkOrder(byte[] bytes)
         {
-            byte[] bytes = BitConverter.GetBytes(host);
-
             if (BitConverter.IsLittleEndian)
                 Array.Reverse(bytes);
 
             return bytes;
         }
 
-        public static float NetworkToHostOrder(byte[] bytes)
+        public static byte[] NetworkToHostOrder(byte[] bytes)
         {
 
             if (BitConverter.IsLittleEndian)
                 Array.Reverse(bytes);
 
-            return BitConverter.ToSingle(bytes, 0);
+            return bytes;
         }
 
 
@@ -84,14 +84,14 @@ namespace Specss
 
         public static void FloatToBytes(float i, MemoryStream s)
         {
-            s.Write(HostToNetworkOrder(i), 0, 4);
+            s.Write(HostToNetworkOrder(BitConverter.GetBytes(i)), 0, 4);
         }
 
         public static float BytesToFloat(MemoryStream s)
         {
             var i = new byte[4];
             s.Read(i, 0, 4);
-            return NetworkToHostOrder(i);
+            return BitConverter.ToSingle(NetworkToHostOrder(i));
         }
 
         public static void UTF8ToBytes(string i, MemoryStream s)
@@ -126,7 +126,16 @@ namespace Specss
             return i;
         }
 
-
+        public static void LongToBytes(long i, MemoryStream s)
+        {
+            s.Write(HostToNetworkOrder(BitConverter.GetBytes(i)));
+        }
+        public static long BytesToLong(MemoryStream s)
+        {
+            var i = new byte[8];
+            s.Read(i, 0, 8);
+            return BitConverter.ToInt64(NetworkToHostOrder(i));
+        }
 
         public static void EncodeField(Field field, MemoryStream ms, object data)
         {
@@ -219,7 +228,7 @@ namespace Specss
             {
 
                 BinaryEncodeUtil.UIntToBytes(f.index, outputMemoryStream);
-
+                
                 if (!data.ContainsKey(f.Name) && f.required)
                     throw new InvalidOperationException("Required field " + f.Name + " is not present");
                 // format will always be
@@ -263,7 +272,6 @@ namespace Specss
                             continue;
                         }
                     var field = schema.GetField((int)fieldID);
-                    Console.WriteLine("reading field " + field.Name);
                     if ((int)field.FieldType.Type != type)
                         throw new InvalidDataException("Schema does not match");
                     var data = BinaryEncodeUtil.DecodeField(field, inputMemoryStream);

@@ -9,7 +9,8 @@ namespace Specss
         UInt32 = 2,
         Float32 = 3,
         UtfEightString = 4,
-        RawBytesString = 5
+        RawBytesString = 5,
+        Long = 6
     }
 
     public struct SpecssFieldType
