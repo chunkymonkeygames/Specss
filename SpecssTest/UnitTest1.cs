@@ -1,4 +1,5 @@
 using Specss;
+using System.Threading.Tasks.Dataflow;
 
 namespace SpecssTest
 {
@@ -17,6 +18,9 @@ namespace SpecssTest
             schema.AddField(new Field("nreq2", new SpecssFieldType(SpecssFieldTypeNum.UtfEightString, false), false));
             schema.AddField(new Field("repeated", new SpecssFieldType(SpecssFieldTypeNum.Int32, true), true));
             schema.AddField(new Field("long", new SpecssFieldType(SpecssFieldTypeNum.Long, false), true));
+            schema.AddField(new Field("bytes", new SpecssFieldType(SpecssFieldTypeNum.RawBytesString, false), false));
+            schema.AddField(new Field("sub", new SpecssFieldType(SpecssFieldTypeNum.RawBytesString, true), false));
+            schema.AddField(new Field("sub2", new SpecssFieldType(SpecssFieldTypeNum.RawBytesString, true), false));
 
             var enc = new BinaryCoder(schema);
             enc.SetField("req", 5);
@@ -26,7 +30,10 @@ namespace SpecssTest
             enc.SetField("req2", "test string");
             enc.SetField("repeated", new int[] { 2, 3, 5, 3 });
             enc.SetField("long", 99392231L);
-            // avoid setting nreq2 to make sure unrequired fields work
+            enc.SetField("bytes", new byte[] { 10, 10, 11, 12 });
+            //var sub = new byte[][] { new byte[] { 0,1,2,3  }, new byte[] { 0,1,2,3 } };
+            var sub = new byte[][] { new byte[] {12, 1, 2, 3 }};
+            enc.SetField("sub", sub);
             enc.Encode();
             var output = enc.GetOutputBytes();
             var dec = new BinaryCoder(schema);
@@ -39,6 +46,7 @@ namespace SpecssTest
             Assert.AreEqual(3.5f, obj["req5"]);
             Assert.AreEqual(99392231L, obj["long"]);
             CollectionAssert.AreEqual(new int[] { 2, 3, 5, 3 }, (int[])obj["repeated"]);
+            CollectionAssert.AreEqual(new byte[] { 10, 10, 11, 12 }, (byte[])obj["bytes"]);
             Console.WriteLine("Tests completed successfully");
         }
     }

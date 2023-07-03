@@ -151,7 +151,7 @@ namespace Specss
             else
             {
                 if (field.FieldType.Repeated)
-                    IntToBytes(1, ms);
+                    IntToBytes(-1, ms);
                 dynamic writer = TypeToByte[field.FieldType.Type];
                 writer(Convert.ChangeType(data, writer.GetType().GetMethod("Invoke").GetParameters()[0].ParameterType), ms);
             }
@@ -170,7 +170,7 @@ namespace Specss
             if (field.FieldType.Repeated)
             {
                 var length = BytesToInt(ms);
-                if (length == 1)
+                if (length == -1)
                 {
                     dynamic decoder = ByteToType[field.FieldType.Type];
                     data = decoder(ms);
