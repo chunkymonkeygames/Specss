@@ -181,10 +181,16 @@ namespace Specss
                     {
                         arr[i] = DecodeField(field, ms);
                     }
-                    Type T = arr[0].GetType();
-                    var method = typeof(BinaryEncodeUtil).GetMethod(nameof(ChangeArrType), BindingFlags.NonPublic | BindingFlags.Static, new Type[] { typeof(object[]) })!;
-                    var gen = method.MakeGenericMethod(T);
-                    data = gen.Invoke(null, new object[] { arr })!;
+                    if (arr.Length > 0)
+                    {
+                        Type T = arr[0].GetType();
+                        var method = typeof(BinaryEncodeUtil).GetMethod(nameof(ChangeArrType), BindingFlags.NonPublic | BindingFlags.Static, new Type[] { typeof(object[]) })!;
+                        var gen = method.MakeGenericMethod(T);
+                        data = gen.Invoke(null, new object[] { arr })!;
+                    } else
+                    {
+                        data = new object[] { };
+                    }
                 }
             } else
             {
